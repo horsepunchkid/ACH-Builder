@@ -1,4 +1,8 @@
-Revision history for Perl extension ACH-Builder.
+Revision history for Perl extension ACH::Builder:
+
+0.20  Tue Nov  5 11:11:22 CST 2013
+    - see logs at: https://github.com/camerb/ACH-Builder
+
 0.10  Tue May 10 12:41:43 CST 2011
     - allowed savings account transaction_codes
     - error for transaction_codes that are unsupported
@@ -13,6 +17,6 @@ Revision history for Perl extension ACH-Builder.
     - fixed pod
 
 0.01  Tue Oct  3 10:46:28 2006
-	- original version; created by h2xs 1.23 with options
-		-n ACH::Builder
+    - original version; created by h2xs 1.23 with options
+        -n ACH::Builder
 
