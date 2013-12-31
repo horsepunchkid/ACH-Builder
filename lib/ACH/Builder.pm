@@ -454,7 +454,7 @@ sub make_file_control_record {
     my $data = {
         record_type            => 9,
         batch_count            => $self->{__BATCH_COUNT__},
-        block_count            => ceil(scalar(@{ $self->{__ACH_DATA__} })/$self->{__BLOCKING_FACTOR__}),
+        block_count            => ceil((scalar(@{ $self->{__ACH_DATA__} })+1)/$self->{__BLOCKING_FACTOR__}),
         file_entry_count       => $self->{__ENTRY_COUNT__},
         entry_hash             => $self->{__ENTRY_HASH__},
         total_debit_amount     => $self->{__FILE_TOTAL_DEBIT__},
