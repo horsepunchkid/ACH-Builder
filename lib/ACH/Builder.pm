@@ -31,7 +31,7 @@ ACH::Builder - Tools for building ACH (Automated Clearing House) files
       # Optional
       company_note      => 'BILL',
       effective_date    => '130903',
-      allow_unbalanced_batch => 1,
+      allow_unbalanced_file => 1,
   } );
 
   # load some sample records
@@ -128,16 +128,9 @@ Optional per batch. Time in C<HHMM> format that the transactions were created at
 Useful when needing to re-create files exactly as they were originally created.
 Defaults to current time.
 
-=head2 allow_unbalanced_batch
+=head2 allow_unbalanced_file
 
-Optional per batch. 1=True, 0=False. Allows for a batch to contain debits and
-credits that don't net to 0. The default is 0. 0 is useful for using the file
-to transfer funds and 1 is useful when only doing debits (billing for services)
-or credits (refunding transactions, distributing funds).
-
-=head2 allow_unbalanced_batch
-
-Optional per batch. 1=True, 0=False. Allows for a batch to contain debits and
+Optional per file. 1=True, 0=False. Allows for a file to contain debits and
 credits that don't net to 0. The default is 0. 0 is useful for using the file
 to transfer funds and 1 is useful when only doing debits (billing for services)
 or credits (refunding transactions, distributing funds).
@@ -206,7 +199,7 @@ sub new {
     $self->set_effective_date(          $vars->{effective_date} || strftime( "%y%m%d", localtime( time + 86400 ) ));
     $self->set_creation_date(           $vars->{creation_date} || strftime( "%y%m%d", localtime( time ) ));
     $self->set_creation_time(           $vars->{creation_time} || strftime( "%H%M", localtime( time ) ));
-    $self->set_allow_unbalanced_batch(  $vars->{allow_unbalanced_batch} || 0);
+    $self->set_allow_unbalanced_file(   $vars->{allow_unbalanced_file} || 0);
 
     $self->set_origin_status_code(      $vars->{origin_status_code} || 1);
     $self->set_file_id_modifier(        $vars->{file_id_modifier}   || 'A');
@@ -474,7 +467,7 @@ once. Afterward, the ACH file can be retrieved in its entirety with C<to_string>
 sub make_file_control_record {
     my( $self ) = @_;
 
-    unless ( $self->{__ALLOW_UNBALANCED_BATCH__} ) {
+    unless ( $self->{__ALLOW_UNBALANCED_FILE__} ) {
         croak "Detail records have unbalanced debits ($self->{__FILE_TOTAL_DEBIT__}) and credits ($self->{__FILE_TOTAL_CREDIT__})!"
             unless $self->{__FILE_TOTAL_DEBIT__} eq $self->{__FILE_TOTAL_CREDIT__};
     }
@@ -903,17 +896,17 @@ sub set_creation_time {
 
 =pod
 
-=head2 set_allow_unbalanced_batch( $value )
+=head2 set_allow_unbalanced_file( $value )
 
-Allow for a batch's credits and debits to be unbalanced. Possible values are
+Allow for a file's credits and debits to be unbalanced. Possible values are
 1 (true) and 0 (false). Default is 0.
 
 =cut
 
-sub set_allow_unbalanced_batch {
+sub set_allow_unbalanced_file {
     my ( $self, $p ) = @_;
-    croak "Invalid allow_unbalanced_batch" unless $p ~~ [qw(0 1)];
-    $self->{__ALLOW_UNBALANCED_BATCH__} = $p;
+    croak "Invalid allow_unbalanced_file" unless $p ~~ [qw(0 1)];
+    $self->{__ALLOW_UNBALANCED_FILE__} = $p;
 }
 
 =pod
