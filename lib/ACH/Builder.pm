@@ -6,7 +6,7 @@ use warnings;
 use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 =pod
 
@@ -31,6 +31,7 @@ ACH::Builder - Tools for building ACH (Automated Clearing House) files
       # Optional
       company_note      => 'BILL',
       effective_date    => '130903',
+      allow_unbalanced_file => 1,
   } );
 
   # load some sample records
@@ -101,6 +102,12 @@ Required per file. This will usually be the same as the C<company_id>.
 Required per file. This will usually be the same as the C<company_name>,
 but note that it can be up to 23 characters long.
 
+=head2 originating_dfi
+
+Optional per file. This will usually be the first 8 positions of C<origination>,
+but it can be set specifically if a certain originating Depository Financial
+Institution is needed.
+
 =head2 company_note
 
 Optional per batch. For your own internal use. Maximum 20 characters.
@@ -108,6 +115,25 @@ Optional per batch. For your own internal use. Maximum 20 characters.
 =head2 effective_date
 
 Optional per batch. Date in C<yymmdd> format that the transactions should be posted.
+
+=head2 creation_date
+
+Optional per batch. Date in C<yymmdd> format that the transactions were created on.
+Useful when needing to re-create files exactly as they were originally created.
+Defaults to current date.
+
+=head2 creation_time
+
+Optional per batch. Time in C<HHMM> format that the transactions were created at.
+Useful when needing to re-create files exactly as they were originally created.
+Defaults to current time.
+
+=head2 allow_unbalanced_file
+
+Optional per file. 1=True, 0=False. Allows for a file to contain debits and
+credits that don't net to 0. The default is 0. 0 is useful for using the file
+to transfer funds and 1 is useful when only doing debits (billing for services)
+or credits (refunding transactions, distributing funds).
 
 =head1 DETAIL RECORD FORMAT
 
@@ -163,6 +189,7 @@ sub new {
     $self->set_immediate_origin_name(   $vars->{origination_name});
     $self->set_immediate_dest(          $vars->{destination});
     $self->set_immediate_origin(        $vars->{origination});
+    $self->set_originating_dfi(         $vars->{originating_dfi});
 
     $self->set_entry_class_code(        $vars->{entry_class_code} || 'PPD');
     $self->set_entry_description(       $vars->{entry_description});
@@ -170,6 +197,9 @@ sub new {
     $self->set_company_name(            $vars->{company_name});
     $self->set_company_note(            $vars->{company_note});
     $self->set_effective_date(          $vars->{effective_date} || strftime( "%y%m%d", localtime( time + 86400 ) ));
+    $self->set_creation_date(           $vars->{creation_date} || strftime( "%y%m%d", localtime( time ) ));
+    $self->set_creation_time(           $vars->{creation_time} || strftime( "%H%M", localtime( time ) ));
+    $self->set_allow_unbalanced_file(   $vars->{allow_unbalanced_file} || 0);
 
     $self->set_origin_status_code(      $vars->{origin_status_code} || 1);
     $self->set_file_id_modifier(        $vars->{file_id_modifier}   || 'A');
@@ -214,8 +244,8 @@ sub make_file_header_record {
         priority_code       => 1,
         immediate_dest      => $self->{__IMMEDIATE_DEST__},
         immediate_origin    => $self->{__IMMEDIATE_ORIGIN__},
-        date                => strftime( "%y%m%d", localtime(time) ),
-        time                => strftime( "%H%M", localtime(time) ),
+        date                => $self->{__CREATION_DATE__},
+        time                => $self->{__CREATION_TIME__},
         file_id_modifier    => $self->{__FILE_ID_MODIFIER__},
         record_size         => $self->{__RECORD_SIZE__},
         blocking_factor     => $self->{__BLOCKING_FACTOR__},
@@ -370,7 +400,7 @@ sub _make_batch_header_record {
         company_id          => $self->{__COMPANY_ID__},
         entry_class_code => $self->{__ENTRY_CLASS_CODE__},
         entry_description => $self->{__ENTRY_DESCRIPTION__},
-        date                => strftime( "%y%m%d", localtime(time) ),
+        date                => $self->{__EFFECTIVE_DATE__},
         effective_date      => $self->{__EFFECTIVE_DATE__},
         settlement_date     => '',
         origin_status_code  => $self->{__ORIGIN_STATUS_CODE__},
@@ -437,8 +467,10 @@ once. Afterward, the ACH file can be retrieved in its entirety with C<to_string>
 sub make_file_control_record {
     my( $self ) = @_;
 
-    croak "Detail records have unbalanced debits ($self->{__FILE_TOTAL_DEBIT__}) and credits ($self->{__FILE_TOTAL_CREDIT__})!"
-        unless $self->{__FILE_TOTAL_DEBIT__} eq $self->{__FILE_TOTAL_CREDIT__};
+    unless ( $self->{__ALLOW_UNBALANCED_FILE__} ) {
+        croak "Detail records have unbalanced debits ($self->{__FILE_TOTAL_DEBIT__}) and credits ($self->{__FILE_TOTAL_CREDIT__})!"
+            unless $self->{__FILE_TOTAL_DEBIT__} eq $self->{__FILE_TOTAL_CREDIT__};
+    }
 
     my @def = qw(
        record_type
@@ -688,6 +720,23 @@ sub set_immediate_origin {
 
 =pod
 
+=head2 set_originating_dfi( $value )
+
+The same as the C<originating_dfi> described above, Originating DFI
+Identification. This will default to the first 8 positions of
+C<origination> unless otherwise specified.
+
+=cut
+
+sub set_originating_dfi {
+    my ( $self, $p ) = @_;
+    $p ||= substr $self->{__IMMEDIATE_ORIGIN__}, 0, 8;
+    check_length($p, 'origin_dfi_id');
+    $self->{__ORIGINATING_DFI__} = $p;
+}
+
+=pod
+
 =head2 set_immediate_dest_name( $value )
 
 The same as the C<destination_name> described above. This identifies the
@@ -809,7 +858,55 @@ in I<YYMMDD> format. Defaults to tomorrow.
 sub set_effective_date {
     my ( $self, $p ) = @_;
     croak "Invalid effective_date" unless $p =~ /^\d{6}$/;
+    check_length($p, 'effective_date');
     $self->{__EFFECTIVE_DATE__} = $p;
+}
+
+=pod
+
+=head2 set_creation_date( $value )
+
+The date that transactions in this batch were created. The date should be
+in I<YYMMDD> format. Defaults to today.
+
+=cut
+
+sub set_creation_date {
+    my ( $self, $p ) = @_;
+    croak "Invalid creation_date" unless $p =~ /^\d{6}$/;
+    check_length($p, 'date');
+    $self->{__CREATION_DATE__} = $p;
+}
+
+=pod
+
+=head2 set_creation_time( $value )
+
+The time that transactions in this batch were created. The time should be
+in I<HHMM> format. Defaults to now.
+
+=cut
+
+sub set_creation_time {
+    my ( $self, $p ) = @_;
+    croak "Invalid creation_time" unless $p =~ /^\d{4}$/;
+    check_length($p, 'time');
+    $self->{__CREATION_TIME__} = $p;
+}
+
+=pod
+
+=head2 set_allow_unbalanced_file( $value )
+
+Allow for a file's credits and debits to be unbalanced. Possible values are
+1 (true) and 0 (false). Default is 0.
+
+=cut
+
+sub set_allow_unbalanced_file {
+    my ( $self, $p ) = @_;
+    croak "Invalid allow_unbalanced_file" unless $p ~~ [qw(0 1)];
+    $self->{__ALLOW_UNBALANCED_FILE__} = $p;
 }
 
 =pod
