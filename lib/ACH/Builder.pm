@@ -6,7 +6,7 @@ use warnings;
 use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 =pod
 
