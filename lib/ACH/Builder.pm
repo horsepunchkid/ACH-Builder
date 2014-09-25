@@ -31,6 +31,7 @@ ACH::Builder - Tools for building ACH (Automated Clearing House) files
       # Optional
       company_note      => 'BILL',
       effective_date    => '130903',
+      allow_unbalanced_batch => 1,
   } );
 
   # load some sample records
@@ -109,6 +110,13 @@ Optional per batch. For your own internal use. Maximum 20 characters.
 
 Optional per batch. Date in C<yymmdd> format that the transactions should be posted.
 
+=head2 allow_unbalanced_batch
+
+Optional per batch. 1=True, 0=False. Allows for a batch to contain debits and
+credits that don't net to 0. The default is 0. 0 is useful for using the file
+to transfer funds and 1 is useful when only doing debits (billing for services)
+or credits (refunding transactions, distributing funds).
+
 =head1 DETAIL RECORD FORMAT
 
 The C<make_batch> function expects entry detail records in this format:
@@ -170,6 +178,7 @@ sub new {
     $self->set_company_name(            $vars->{company_name});
     $self->set_company_note(            $vars->{company_note});
     $self->set_effective_date(          $vars->{effective_date} || strftime( "%y%m%d", localtime( time + 86400 ) ));
+    $self->set_allow_unbalanced_batch(  $vars->{allow_unbalanced_batch} || 0);
 
     $self->set_origin_status_code(      $vars->{origin_status_code} || 1);
     $self->set_file_id_modifier(        $vars->{file_id_modifier}   || 'A');
@@ -437,8 +446,10 @@ once. Afterward, the ACH file can be retrieved in its entirety with C<to_string>
 sub make_file_control_record {
     my( $self ) = @_;
 
-    croak "Detail records have unbalanced debits ($self->{__FILE_TOTAL_DEBIT__}) and credits ($self->{__FILE_TOTAL_CREDIT__})!"
-        unless $self->{__FILE_TOTAL_DEBIT__} eq $self->{__FILE_TOTAL_CREDIT__};
+    unless ( $self->{__ALLOW_UNBALANCED_BATCH__} ) {
+        croak "Detail records have unbalanced debits ($self->{__FILE_TOTAL_DEBIT__}) and credits ($self->{__FILE_TOTAL_CREDIT__})!"
+            unless $self->{__FILE_TOTAL_DEBIT__} eq $self->{__FILE_TOTAL_CREDIT__};
+    }
 
     my @def = qw(
        record_type
@@ -810,6 +821,21 @@ sub set_effective_date {
     my ( $self, $p ) = @_;
     croak "Invalid effective_date" unless $p =~ /^\d{6}$/;
     $self->{__EFFECTIVE_DATE__} = $p;
+}
+
+=pod
+
+=head2 set_allow_unbalanced_batch( $value )
+
+Allow for a batch's credits and debits to be unbalanced. Possible values are
+1 (true) and 0 (false). Default is 0.
+
+=cut
+
+sub set_allow_unbalanced_batch {
+    my ( $self, $p ) = @_;
+    croak "Invalid allow_unbalanced_batch" unless $p ~~ [qw(0 1)];
+    $self->{__ALLOW_UNBALANCED_BATCH__} = $p;
 }
 
 =pod
