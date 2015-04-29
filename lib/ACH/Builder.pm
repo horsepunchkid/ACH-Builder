@@ -2,6 +2,7 @@ package ACH::Builder;
 
 use strict;
 use warnings;
+no warnings 'uninitialized';
 
 use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
