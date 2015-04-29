@@ -67,6 +67,8 @@ is(scalar @{$ach->ach_data}, 6, 'record count after file control');
 is($ach->ach_data->[5], $sample_lines->[5], 'file control record format');
 
 # test combining lines
-is(join("\n", @{$sample_lines}), $ach->to_string, 'to_string');
+is(join('', map "$_\n", @{$sample_lines}), $ach->to_string, 'default terminator');
+is(join('', map "${_}X", @{$sample_lines}), $ach->to_string('X'), 'alternate terminator');
+is(join('', @{$sample_lines}), $ach->to_string(''), 'no terminator');
 
-done_testing(13);
+done_testing(15);

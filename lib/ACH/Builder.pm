@@ -591,15 +591,16 @@ sub fixedlength {
 
 =pod
 
-=head2 to_string( )
+=head2 to_string([$line_term])
 
-Returns the built ACH file.
+Returns the built ACH file. $line_term is added to each line (default "\n")
 
 =cut
 
 sub to_string {
-    my $self = shift;
-    return( join( "\n", @{ $self->{__ACH_DATA__} } ) );
+    my ($self, $line_term) = @_;
+    $line_term = "\n" unless defined($line_term);
+    join('', map "$_$line_term", @{ $self->ach_data } );
 }
 
 =pod
