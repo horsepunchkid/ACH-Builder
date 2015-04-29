@@ -518,7 +518,7 @@ total number of records is a multiple of 10.
 sub make_filler_records
 {
   my $self = shift;
-  while (@{$self->ach_data} % 10 != 0) {
+  while (@{$self->ach_data} % $self->{__BLOCKING_FACTOR__} != 0) {
     push @{$self->ach_data}, '9' x $self->{__RECORD_SIZE__};
   }
 }

@@ -83,4 +83,11 @@ is(join('', map "$_\n", @{$sample_lines}), $ach->to_string, 'default terminator'
 is(join('', map "${_}X", @{$sample_lines}), $ach->to_string('X'), 'alternate terminator');
 is(join('', @{$sample_lines}), $ach->to_string(''), 'no terminator');
 
-done_testing(21);
+# test alternate blocking factor
+$ach = ACH::Builder->new($sample_config);
+$ach->{__BLOCKING_FACTOR__} = 3;
+$ach->make_file_header_record;
+$ach->make_filler_records;
+is(scalar @{$ach->ach_data}, 3, 'record count with blocking factor 3');
+
+done_testing(22);
