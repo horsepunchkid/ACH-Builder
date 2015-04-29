@@ -39,6 +39,10 @@ my $sample_lines = [
   '632010010401440030030        0000002501verylongaccountALICE VERYLONGNAMEGETS  0123123110000003',
   '8200000002000200205000000000250100000000250111-111111                          123123110000001',
   '9000001000001000000020002002050000000002501000000002501                                       ',
+  '9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999',
+  '9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999',
+  '9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999',
+  '9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999',
 ];
 
 my $ach;
@@ -66,9 +70,17 @@ $ach->make_file_control_record;
 is(scalar @{$ach->ach_data}, 6, 'record count after file control');
 is($ach->ach_data->[5], $sample_lines->[5], 'file control record format');
 
+# add 9's filler records
+$ach->make_filler_records;
+is(scalar @{$ach->ach_data}, 10, 'record count after filler');
+is($ach->ach_data->[$_], $sample_lines->[$_], 'filler record format') for 6..9;
+
+$ach->make_filler_records;
+is(scalar @{$ach->ach_data}, 10, 'record count after redundant filler');
+
 # test combining lines
 is(join('', map "$_\n", @{$sample_lines}), $ach->to_string, 'default terminator');
 is(join('', map "${_}X", @{$sample_lines}), $ach->to_string('X'), 'alternate terminator');
 is(join('', @{$sample_lines}), $ach->to_string(''), 'no terminator');
 
-done_testing(15);
+done_testing(21);

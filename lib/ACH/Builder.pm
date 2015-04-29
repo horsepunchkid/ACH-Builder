@@ -52,6 +52,9 @@ ACH::Builder - Tools for building ACH (Automated Clearing House) files
   # build file control record
   $ach->make_file_control_record;
 
+  # add 9's filler records as needed
+  $ach->make_filler_records;
+
   print $ach->to_string;
 
 =head1 DESCRIPTION
@@ -502,6 +505,24 @@ sub make_file_control_record {
         fixedlength( $self->format_rules(), $data, \@def )
     );
 }
+
+=pod
+
+=head2 make_filler_records( )
+
+Adds filler records (all 9's) as needed to fill out last block, so that the
+total number of records is a multiple of 10.
+
+=cut
+
+sub make_filler_records
+{
+  my $self = shift;
+  while (@{$self->ach_data} % 10 != 0) {
+    push @{$self->ach_data}, '9' x $self->{__RECORD_SIZE__};
+  }
+}
+
 
 =pod
 
