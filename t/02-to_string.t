@@ -1,22 +1,8 @@
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl ACH-Builder.t'
-
-#########################
-
 use strict;
 use warnings;
 
-# change 'tests => 1' to 'tests => last_test_to_print';
-
 use Test::More;
-BEGIN { use_ok('ACH::Builder') };
-
-#########################
-
-# Insert your test code below, the Test::More module is use()ed here so read
-# its man page ( perldoc Test::More ) for help writing this test script.
-
-isa_ok(ACH::Builder->new, 'ACH::Builder', 'empty constructor');
+use ACH::Builder;
 
 my $sample_config = {
   company_id        => '11-111111',
@@ -47,47 +33,16 @@ my $sample_lines = [
 
 my $ach;
 
-# create builder
 $ach = ACH::Builder->new($sample_config);
-is(scalar @{$ach->ach_data}, 0, 'new builder');
-
-# add file header record
 $ach->make_file_header_record;
-is(scalar @{$ach->ach_data}, 1, 'record count after file header');
-is($ach->ach_data->[0], $sample_lines->[0], 'file header record format');
-
-# add batch for sample records
 $ach->set_entry_class_code('WEB');
 $ach->make_batch([$ach->sample_detail_records]);
-is(scalar @{$ach->ach_data}, 5, 'record count after batch');
-is($ach->ach_data->[1], $sample_lines->[1], 'batch header record format');
-is($ach->ach_data->[2], $sample_lines->[2], 'entry detail record format');
-is($ach->ach_data->[3], $sample_lines->[3], 'entry detail record format');
-is($ach->ach_data->[4], $sample_lines->[4], 'batch control record format');
-
-# add file control record
 $ach->make_file_control_record;
-is(scalar @{$ach->ach_data}, 6, 'record count after file control');
-is($ach->ach_data->[5], $sample_lines->[5], 'file control record format');
-
-# add 9's filler records
 $ach->make_filler_records;
-is(scalar @{$ach->ach_data}, 10, 'record count after filler');
-is($ach->ach_data->[$_], $sample_lines->[$_], 'filler record format') for 6..9;
-
-$ach->make_filler_records;
-is(scalar @{$ach->ach_data}, 10, 'record count after redundant filler');
 
 # test combining lines
 is(join('', map "$_\n", @{$sample_lines}), $ach->to_string, 'default terminator');
 is(join('', map "${_}X", @{$sample_lines}), $ach->to_string('X'), 'alternate terminator');
 is(join('', @{$sample_lines}), $ach->to_string(''), 'no terminator');
 
-# test alternate blocking factor
-$ach = ACH::Builder->new($sample_config);
-$ach->{__BLOCKING_FACTOR__} = 3;
-$ach->make_file_header_record;
-$ach->make_filler_records;
-is(scalar @{$ach->ach_data}, 3, 'record count with blocking factor 3');
-
-done_testing(22);
+done_testing(3);
