@@ -6,6 +6,7 @@ no warnings 'uninitialized';
 
 use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
+use Encode qw( encode );
 
 our $VERSION = '0.21';
 
@@ -634,6 +635,7 @@ sub format_rules {
 }
 
 # For internal use only. Formats a record according to format_rules.
+# non-ASCII characters are replaced with a substitution characer ("?").
 sub fixedlength {
     my( $format, $data, $order ) = @_;
 
@@ -647,7 +649,7 @@ sub fixedlength {
 
         $data->{$field} ||= "";
 
-        $fmt_string .= sprintf $format->{$field}, $data->{$field};
+        $fmt_string .= sprintf $format->{$field}, encode('ascii', $data->{$field}, Encode::FB_DEFAULT);
     }
 
     return $fmt_string;
@@ -1027,6 +1029,12 @@ ACH file structure:
 
 Only certain types of ACH transactions are supported (see the detail
 record format above).
+
+=head1 ENCODING
+
+The ACH file format only supports ASCII characters. All data is converted to
+ASCII using Encode::encode(). Any non-ASCII characters in the input are
+replaced with a substitution character ("?").
 
 =head1 AUTHOR
 
