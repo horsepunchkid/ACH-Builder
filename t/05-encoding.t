@@ -21,4 +21,4 @@ my $ach = ACH::Builder->new($sample_config);
 $ach->make_file_header_record;
 is('101 123123123  123123111309031234A094101COMMERCE BANK          Se?or Frog                     ' , $ach->ach_data->[0], 'replace non-ascii chars');
 
-done_testing();
+done_testing(1);
