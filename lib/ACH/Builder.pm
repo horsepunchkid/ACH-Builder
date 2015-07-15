@@ -2,9 +2,11 @@ package ACH::Builder;
 
 use strict;
 use warnings;
+no warnings 'uninitialized';
 
 use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
+use Encode qw( encode );
 
 our $VERSION = '0.21';
 
@@ -50,6 +52,9 @@ ACH::Builder - Tools for building ACH (Automated Clearing House) files
 
   # build file control record
   $ach->make_file_control_record;
+
+  # add 9's filler records as needed
+  $ach->make_filler_records;
 
   print $ach->to_string;
 
@@ -147,6 +152,12 @@ The C<make_batch> function expects entry detail records in this format:
    bank_account     => '103030030',    # Maximum of 17 characters
    transaction_code => '27',
    entry_trace      => 'ABCDE0000000001', # Optional trace number
+   addenda          => [               # optional addenda entries
+     {
+       addendum_code => '05',
+       addendum_info => 'TEST INFO',
+     },
+   ],
  }
 
 Only the following transaction codes are supported:
@@ -336,7 +347,8 @@ sub make_batch {
         $self->{__ENTRY_HASH__} += substr $record->{routing_number}, 0, 8;
         ++$self->{__ENTRY_COUNT__};
 
-        $self->_make_detail_record( $record )
+        $self->_make_detail_record( $record );
+        $self->_make_addenda_records( $record );
     }
 
     $self->_make_batch_control_record();
@@ -355,7 +367,7 @@ sub _make_detail_record {
         customer_acct
         customer_name
         discretionary_data
-        addenda
+        addenda_indicator
         entry_trace
     );
 
@@ -364,12 +376,43 @@ sub _make_detail_record {
     $record->{discretionary_data}   ||= '';
     $record->{entry_trace}          ||= substr($self->{__ORIGINATING_DFI__}, 0, 8)
                                         . sprintf("%07s", $self->{__ENTRY_COUNT__}+1);
-    $record->{addenda}              ||= 0;
+    $record->{addenda}              ||= [];
+    $record->{addenda_indicator}    ||= @{$record->{addenda}} ? '1' : '0';
 
     # stash detail record
     push( @{ $self->ach_data() },
         fixedlength( $self->format_rules(), $record, \@def )
     );
+}
+
+# For internal use only. Makes the addenda record(s), if any, for the current
+# detail.
+sub _make_addenda_records
+{
+    my( $self, $record ) = @_;
+
+    my @def = qw(
+        record_type
+        addendum_code
+        addendum_info
+        addendum_sequence
+        entry_sequence
+    );
+
+    my $addendum_sequence = 0;
+    for my $addendum (@{$record->{addenda}}) {
+      $addendum_sequence++;
+
+      # default some fields
+      $addendum->{record_type} ||= '7';
+      $addendum->{addendum_sequence} ||= $addendum_sequence;
+      $addendum->{entry_sequence} ||= substr($record->{entry_trace}, -7);
+
+      # add and count addenda record
+      push @{$self->ach_data}, fixedlength( $self->format_rules, $addendum, \@def );
+      $self->{__BATCH_ENTRY_COUNT__}++;
+      $self->{__ENTRY_COUNT__}++;
+    }
 }
 
 # For internal use only. Starts a batch of detail records.
@@ -504,6 +547,24 @@ sub make_file_control_record {
 
 =pod
 
+=head2 make_filler_records( )
+
+Adds filler records (all 9's) as needed to fill out last block, so that the
+total number of records is a multiple of 10.
+
+=cut
+
+sub make_filler_records
+{
+  my $self = shift;
+  while (@{$self->ach_data} % $self->{__BLOCKING_FACTOR__} != 0) {
+    push @{$self->ach_data}, '9' x $self->{__RECORD_SIZE__};
+  }
+}
+
+
+=pod
+
 =head2 format_rules( )
 
 Returns a hash of ACH format rules. Used internally to generate the
@@ -520,7 +581,7 @@ sub format_rules {
         amount              => '%010.10s',
         discretionary_data  => '%-2.2s',
         entry_trace         => '%-15.15s',
-        addenda             => '%01.1s',
+        addenda_indicator   => '%01.1s',
         trace_num           => '%-15.15s',
         transaction_code    => '%-2.2s',
         record_type         => '%1.1s',
@@ -554,6 +615,11 @@ sub format_rules {
         origin_dfi_id         => '%-8.8s',  # for bank
         batch_number          => '%07.7s',
 
+        addendum_code         => '%-2.2s',
+        addendum_info         => '%-80.80s',
+        addendum_sequence     => '%04s',
+        entry_sequence        => '%07s',
+
         entry_count           => '%06s',
         entry_hash            => '%010s',
         total_debit_amount    => '%012s',
@@ -569,6 +635,7 @@ sub format_rules {
 }
 
 # For internal use only. Formats a record according to format_rules.
+# non-ASCII characters are replaced with a substitution characer ("?").
 sub fixedlength {
     my( $format, $data, $order ) = @_;
 
@@ -582,7 +649,7 @@ sub fixedlength {
 
         $data->{$field} ||= "";
 
-        $fmt_string .= sprintf $format->{$field}, $data->{$field};
+        $fmt_string .= sprintf $format->{$field}, encode('ascii', $data->{$field}, Encode::FB_DEFAULT);
     }
 
     return $fmt_string;
@@ -590,15 +657,16 @@ sub fixedlength {
 
 =pod
 
-=head2 to_string( )
+=head2 to_string([$line_term])
 
-Returns the built ACH file.
+Returns the built ACH file. $line_term is added to each line (default "\n")
 
 =cut
 
 sub to_string {
-    my $self = shift;
-    return( join( "\n", @{ $self->{__ACH_DATA__} } ) );
+    my ($self, $line_term) = @_;
+    $line_term = "\n" unless defined($line_term);
+    join('', map "$_$line_term", @{ $self->ach_data } );
 }
 
 =pod
@@ -961,6 +1029,12 @@ ACH file structure:
 
 Only certain types of ACH transactions are supported (see the detail
 record format above).
+
+=head1 ENCODING
+
+The ACH file format only supports ASCII characters. All data is converted to
+ASCII using Encode::encode(). Any non-ASCII characters in the input are
+replaced with a substitution character ("?").
 
 =head1 AUTHOR
 
