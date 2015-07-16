@@ -8,7 +8,7 @@ use POSIX qw( ceil strftime );
 use Carp qw( carp croak );
 use Encode qw( encode );
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 =pod
 
@@ -966,14 +966,12 @@ sub set_creation_time {
 
 =head2 set_allow_unbalanced_file( $value )
 
-Allow for a file's credits and debits to be unbalanced. Possible values are
-1 (true) and 0 (false). Default is 0.
+Allow for a file's credits and debits to be unbalanced. Default is false.
 
 =cut
 
 sub set_allow_unbalanced_file {
     my ( $self, $p ) = @_;
-    croak "Invalid allow_unbalanced_file" unless $p ~~ [qw(0 1)];
     $self->{__ALLOW_UNBALANCED_FILE__} = $p;
 }
 
