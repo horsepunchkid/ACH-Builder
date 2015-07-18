@@ -4,6 +4,8 @@ Makefile.PL
 README.md
 lib/ACH/Builder.pm
 t/00-load.t
-t/manifest.t
-t/pod-coverage.t
-t/pod.t
+t/01-format.t
+t/02-to_string.t
+t/03-blocking_factor.t
+t/04-addenda.t
+t/05-encoding.t
